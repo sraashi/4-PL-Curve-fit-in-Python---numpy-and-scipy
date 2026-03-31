@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>4PL Dose-Response Curve Fitting Tutorial</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script>
+    MathJax = { tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']] } };
+  </script>
+  <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  <style>
+    :root {
+      --accent: #2980b9;
+      --accent-light: #d6eaf8;
+      --success: #27ae60;
+      --danger: #e74c3c;
+      --bg: #ffffff;
+      --surface: #f8f9fa;
+      --border: #dee2e6;
+      --text: #212529;
+      --muted: #6c757d;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.7;
+    }
+    nav {
+      background: var(--accent);
+      color: white;
+      padding: 0.75rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      gap: 1.5rem;
+      align-items: center;
+    }
+    nav a { color: white; text-decoration: none; font-size: 0.9rem; opacity: 0.85; }
+    nav a:hover { opacity: 1; }
+    nav .title { font-weight: 600; opacity: 1; margin-right: 1rem; }
+    main { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    section { margin-bottom: 3rem; }
+    h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+    h2 { font-size: 1.4rem; color: var(--accent); margin-bottom: 1rem; border-bottom: 2px solid var(--accent-light); padding-bottom: 0.4rem; }
+    h3 { font-size: 1.1rem; margin: 1.2rem 0 0.5rem; }
+    p { margin-bottom: 0.9rem; }
+    .subtitle { color: var(--muted); font-size: 1.05rem; margin-bottom: 1.5rem; }
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--accent-light);
+      padding: 0.8rem 1.1rem;
+      border-radius: 0 6px 6px 0;
+      margin: 1.2rem 0;
+    }
+    .callout strong { display: block; margin-bottom: 0.25rem; }
+    .param-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+    .param-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.9rem 1rem;
+    }
+    .param-card .sym { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+    .param-card .name { font-weight: 600; margin: 0.2rem 0; }
+    .param-card p { font-size: 0.88rem; color: var(--muted); margin: 0; }
+    #plot { width: 100%; height: 460px; }
+    .results-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.2rem;
+      margin-top: 1rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.5rem 1.5rem;
+    }
+    .result-item { font-size: 0.92rem; }
+    .result-item .label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .result-item .value { font-size: 1.15rem; font-weight: 600; color: var(--text); }
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.7rem;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      background: #d4edda;
+      color: #155724;
+    }
+    .sliders-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem 2rem;
+      margin: 1.2rem 0;
+    }
+    .slider-row label { font-size: 0.9rem; font-weight: 500; display: flex; justify-content: space-between; }
+    .slider-row input[type=range] { width: 100%; margin-top: 0.3rem; accent-color: var(--accent); }
+    .slider-row .val { color: var(--accent); font-weight: 700; }
+    #sliderPlot { width: 100%; height: 360px; margin-top: 1rem; }
+    details { margin: 0.8rem 0; }
+    summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 0.4rem 0; }
+    pre {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      padding: 1rem 1.2rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      line-height: 1.6;
+      margin-top: 0.5rem;
+    }
+    .refs ol { padding-left: 1.5rem; }
+    .refs li { margin-bottom: 0.5rem; font-size: 0.92rem; }
+    footer { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--border); }
+    @media (max-width: 600px) {
+      .sliders-grid { grid-template-columns: 1fr; }
+      nav a { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="title">4PL Tutorial</span>
+  <a href="#intro">Intro</a>
+  <a href="#math">The Math</a>
+  <a href="#interactive">Try It</a>
+  <a href="#playground">Playground</a>
+  <a href="#code">Code</a>
+</nav>
+
+<main>
+
+  <!-- INTRO -->
+  <section id="intro">
+    <h1>4-Parameter Logistic (4PL) Curve Fitting</h1>
+    <p class="subtitle">A hands-on tutorial for biologists — no coding required.</p>
+    <p>
+      When you test a drug at increasing concentrations, the biological response typically follows
+      an S-shaped (sigmoidal) curve. At low doses, little happens. As the dose rises, response
+      increases steeply. At high doses, the system saturates and response levels off.
+    </p>
+    <p>
+      The <strong>4-Parameter Logistic (4PL)</strong> model captures this shape mathematically.
+      It is the standard method for calculating IC50 and EC50 values in pharmacology and
+      biochemical assays. This tutorial walks you through the equation, the fitting process,
+      and lets you interact with real data.
+    </p>
+    <div class="callout">
+      <strong>Example dataset</strong>
+      Real dose-response data from PubChem BioAssay AID 1619 — a screen for inhibitors of
+      <em>Plasmodium falciparum</em> M17-family leucine aminopeptidase (M17LAP), a malaria drug target.
+      Eight concentrations (1–100 µM) with % inhibition readout.
+    </div>
+  </section>
+
+  <!-- MATH -->
+  <section id="math">
+    <h2>The 4PL Equation</h2>
+    <p>The 4PL model describes response as a function of concentration $x$:</p>
+    <p style="text-align:center; font-size: 1.1rem; margin: 1.5rem 0;">
+      $$f(x) = A + \frac{D - A}{1 + \left(\dfrac{C}{x}\right)^B}$$
+    </p>
+    <p>There are four parameters — one for each part of the curve's shape:</p>
+    <div class="param-grid">
+      <div class="param-card">
+        <div class="sym">A</div>
+        <div class="name">Bottom asymptote</div>
+        <p>Response at zero concentration (background / baseline signal).</p>
+      </div>
+      <div class="param-card">
+        <div class="sym">B</div>
+        <div class="name">Hill slope</div>
+        <p>Steepness of the curve. B &gt; 1 = steep; B &lt; 1 = shallow; B = 1 = classic Hill.</p>
+      </div>
+      <div class="param-card">
+        <div class="sym">C</div>
+        <div class="name">IC50 / EC50</div>
+        <p>Concentration at half-maximal response. The key output of most assays.</p>
+      </div>
+      <div class="param-card">
+        <div class="sym">D</div>
+        <div class="name">Top asymptote</div>
+        <p>Maximum response at saturating concentration (full inhibition / activation).</p>
+      </div>
+    </div>
+    <div class="callout">
+      <strong>Why a log x-axis?</strong>
+      Dose-response experiments use multiplicative concentration spacing (e.g., 1, 3, 10, 30, 100 µM).
+      Plotting on a log scale spreads these evenly and makes the sigmoid symmetric — which is why
+      every dose-response plot uses a logarithmic x-axis.
+    </div>
+  </section>
+
+  <!-- INTERACTIVE -->
+  <section id="interactive">
+    <h2>Interactive Curve Fitter</h2>
+    <p>
+      The plot below shows real inhibition data (red dots) for one compound from PubChem AID 1619,
+      along with the best-fit 4PL curve (blue line). The IC50 is annotated with a dashed green line.
+    </p>
+    <div id="plot"></div>
+    <div class="results-panel" id="results">
+      <div class="result-item"><div class="label">Bottom (A)</div><div class="value" id="rA">—</div></div>
+      <div class="result-item"><div class="label">Hill slope (B)</div><div class="value" id="rB">—</div></div>
+      <div class="result-item"><div class="label">IC50 (C)</div><div class="value" id="rC">—</div></div>
+      <div class="result-item"><div class="label">Top (D)</div><div class="value" id="rD">—</div></div>
+      <div class="result-item"><div class="label">R²</div><div class="value" id="rR2">—</div></div>
+      <div class="result-item"><div class="label">Fit quality</div><div class="value"><span class="badge" id="rBadge"></span></div></div>
+    </div>
+    <p style="font-size:0.85rem; color:var(--muted); margin-top:0.6rem;">
+      Data source: PubChem BioAssay AID 1619 (SID 842727). IC50 reported by PubChem: 13.82 µM.
+    </p>
+  </section>
+
+  <!-- PLAYGROUND -->
+  <section id="playground">
+    <h2>Parameter Playground</h2>
+    <p>Move the sliders to see how each parameter changes the shape of the 4PL curve in real time.</p>
+    <div class="sliders-grid">
+      <div class="slider-row">
+        <label>A — Bottom asymptote: <span class="val" id="valA">2</span>%</label>
+        <input type="range" id="sA" min="-10" max="40" step="0.5" value="2">
+      </div>
+      <div class="slider-row">
+        <label>B — Hill slope: <span class="val" id="valB">1.0</span></label>
+        <input type="range" id="sB" min="0.1" max="5" step="0.1" value="1.0">
+      </div>
+      <div class="slider-row">
+        <label>C — IC50: <span class="val" id="valC">10</span> µM</label>
+        <input type="range" id="sC" min="-1" max="3" step="0.05" value="1">
+      </div>
+      <div class="slider-row">
+        <label>D — Top asymptote: <span class="val" id="valD">95</span>%</label>
+        <input type="range" id="sD" min="60" max="120" step="1" value="95">
+      </div>
+    </div>
+    <div id="sliderPlot"></div>
+  </section>
+
+  <!-- CODE WALKTHROUGH -->
+  <section id="code">
+    <h2>How the Fitting Works</h2>
+    <p>
+      The curve is fitted using the <strong>Nelder-Mead</strong> algorithm — a numerical optimizer
+      that finds the parameter values minimizing the sum of squared differences between the model
+      and your data. No matrix algebra, no derivatives needed.
+    </p>
+    <details>
+      <summary>Step 1: Define the 4PL function</summary>
+      <pre>// Ascending form: % inhibition increases with concentration
+// A = bottom, B = Hill slope, C = IC50, D = top
+function fourPL(x, A, B, C, D) {
+  return A + (D - A) / (1 + Math.pow(C / x, B));
+}</pre>
+    </details>
+    <details>
+      <summary>Step 2: Measure the error (sum of squared residuals)</summary>
+      <pre>function sumSquares(params, conc, obs) {
+  const [A, B, C, D] = params;
+  if (C <= 0 || B <= 0) return 1e12; // reject impossible values
+  return obs.reduce((acc, y, i) => {
+    return acc + (y - fourPL(conc[i], A, B, C, D)) ** 2;
+  }, 0);
+}</pre>
+    </details>
+    <details>
+      <summary>Step 3: Auto-generate a starting guess from the data</summary>
+      <pre>function initialGuess(conc, obs) {
+  const A = Math.min(...obs);
+  const D = Math.max(...obs);
+  const mid = (A + D) / 2;
+  let bestIdx = 0, bestDist = Infinity;
+  obs.forEach((y, i) => {
+    const d = Math.abs(y - mid);
+    if (d < bestDist) { bestDist = d; bestIdx = i; }
+  });
+  return [A, 1.0, conc[bestIdx], D]; // [A, B, C, D]
+}</pre>
+    </details>
+    <details>
+      <summary>Step 4: Run Nelder-Mead to find the best parameters</summary>
+      <pre>// The optimizer tries many combinations of A, B, C, D
+// and homes in on the values that minimize the error.
+// Returns: { x: [A, B, C, D], fx: finalError }
+const result = nelderMead(
+  params => sumSquares(params, conc, obs),
+  initialGuess(conc, obs)
+);</pre>
+    </details>
+    <details>
+      <summary>Step 5: Plot with Plotly.js</summary>
+      <pre>Plotly.newPlot('plot', [
+  // Raw data points
+  { x: conc, y: obs, mode: 'markers', name: 'Data',
+    marker: { size: 10, color: '#e74c3c' } },
+  // Smooth fitted curve
+  { x: xSmooth, y: ySmooth, mode: 'lines', name: '4PL Fit',
+    line: { color: '#2980b9', width: 2.5 } }
+], {
+  xaxis: { type: 'log', title: 'Concentration (µM)' },
+  yaxis: { title: '% Inhibition' }
+});</pre>
+    </details>
+  </section>
+
+  <!-- REFERENCES -->
+  <section id="refs" class="refs">
+    <h2>References</h2>
+    <ol>
+      <li>DeLean, A., Munson, P.J. & Rodbard, D. (1978). Simultaneous analysis of families of sigmoidal curves. <em>Am J Physiol</em>, 235(2):E97–102.</li>
+      <li>Sebaugh, J.L. (2011). Guidelines for accurate EC50/IC50 estimation. <em>Pharmaceutical Statistics</em>, 10(2):128–134.</li>
+      <li>Nelder, J.A. & Mead, R. (1965). A simplex method for function minimization. <em>Computer Journal</em>, 7(4):308–313.</li>
+      <li>PubChem BioAssay AID 1619 — MLSCN: Inhibitors of <em>P. falciparum</em> M17LAP. Southern Research Institute.</li>
+    </ol>
+  </section>
+
+</main>
+
+<footer>
+  Data sourced from PubChem BioAssay AID 1619 via the PubChem REST API. Tutorial for educational use.
+</footer>
+
+<script>
+// ── Real data (PubChem AID 1619, SID 842727) ──────────────────────────────
+const CONC   = [1, 2, 5, 10, 15, 25, 50, 100];   // µM
+const OBS    = [4.59, 11.08, 29.88, 43.11, 52.87, 64.60, 74.72, 85.82]; // % inhibition
+const PUBCHEM_IC50 = 13.82; // µM (reported by PubChem)
+
+// ── 4PL model (ascending form for % inhibition assays) ───────────────────
+function fourPL(x, A, B, C, D) {
+  if (x <= 0 || C <= 0) return NaN;
+  return A + (D - A) / (1 + Math.pow(C / x, B));
+}
+
+// ── Sum of squared residuals ──────────────────────────────────────────────
+function sumSquares(params, conc, obs) {
+  const [A, B, C, D] = params;
+  if (C <= 0 || B <= 0) return 1e12;
+  return obs.reduce((acc, y, i) => acc + (y - fourPL(conc[i], A, B, C, D)) ** 2, 0);
+}
+
+// ── R² ────────────────────────────────────────────────────────────────────
+function rSquared(params, conc, obs) {
+  const ybar = obs.reduce((a, b) => a + b, 0) / obs.length;
+  const SStot = obs.reduce((acc, y) => acc + (y - ybar) ** 2, 0);
+  return 1 - sumSquares(params, conc, obs) / SStot;
+}
+
+// ── Auto initial guess from data ──────────────────────────────────────────
+function initialGuess(conc, obs) {
+  const A = Math.min(...obs);
+  const D = Math.max(...obs);
+  const mid = (A + D) / 2;
+  let bestIdx = 0, bestDist = Infinity;
+  obs.forEach((y, i) => { const d = Math.abs(y - mid); if (d < bestDist) { bestDist = d; bestIdx = i; } });
+  return [A, 1.0, conc[bestIdx], D];
+}
+
+// ── Nelder-Mead minimizer ─────────────────────────────────────────────────
+function nelderMead(fn, x0, maxIter = 5000, tol = 1e-9) {
+  const n = x0.length;
+  let s = [x0.slice()];
+  for (let i = 0; i < n; i++) {
+    const pt = x0.slice();
+    pt[i] = Math.abs(pt[i]) > 1e-8 ? pt[i] * 1.1 : 0.001;
+    s.push(pt);
+  }
+  let fv = s.map(fn);
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    // sort
+    const idx = fv.map((v, i) => i).sort((a, b) => fv[a] - fv[b]);
+    s = idx.map(i => s[i]); fv = idx.map(i => fv[i]);
+
+    // check convergence
+    const worst = fv[n], best = fv[0];
+    if (worst - best < tol) break;
+
+    // centroid (exclude worst)
+    const cen = Array(n).fill(0);
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) cen[j] += s[i][j] / n;
+
+    // reflect
+    const ref = cen.map((c, j) => 2 * c - s[n][j]);
+    const fref = fn(ref);
+
+    if (fref < fv[0]) {
+      // expand
+      const exp = cen.map((c, j) => 3 * c - 2 * s[n][j]);
+      const fexp = fn(exp);
+      if (fexp < fref) { s[n] = exp; fv[n] = fexp; } else { s[n] = ref; fv[n] = fref; }
+    } else if (fref < fv[n - 1]) {
+      s[n] = ref; fv[n] = fref;
+    } else {
+      // contract
+      const con = cen.map((c, j) => 0.5 * (c + s[n][j]));
+      const fcon = fn(con);
+      if (fcon < fv[n]) { s[n] = con; fv[n] = fcon; }
+      else {
+        // shrink
+        for (let i = 1; i <= n; i++) {
+          s[i] = s[i].map((v, j) => 0.5 * (s[0][j] + v));
+          fv[i] = fn(s[i]);
+        }
+      }
+    }
+  }
+  return s[0];
+}
+
+// ── Log-spaced x values for smooth curve ─────────────────────────────────
+function logspace(lo, hi, n) {
+  const a = Math.log10(lo), b = Math.log10(hi);
+  return Array.from({ length: n }, (_, i) => Math.pow(10, a + i * (b - a) / (n - 1)));
+}
+
+// ── Fit and render main plot ──────────────────────────────────────────────
+function fitAndPlot() {
+  const guess = initialGuess(CONC, OBS);
+  const params = nelderMead(p => sumSquares(p, CONC, OBS), guess);
+  const [A, B, C, D] = params;
+  const r2 = rSquared(params, CONC, OBS);
+
+  const xSmooth = logspace(0.3, 300, 300);
+  const ySmooth = xSmooth.map(x => fourPL(x, A, B, C, D));
+  const yIC50 = fourPL(C, A, B, C, D);
+
+  const traces = [
+    {
+      x: CONC, y: OBS, mode: 'markers', name: 'Measured Data',
+      marker: { size: 11, color: '#e74c3c', symbol: 'circle' }
+    },
+    {
+      x: xSmooth, y: ySmooth, mode: 'lines', name: '4PL Fit',
+      line: { color: '#2980b9', width: 2.5 }
+    }
+  ];
+
+  const layout = {
+    xaxis: { type: 'log', title: 'Concentration (µM)', gridcolor: '#eee', dtick: 1 },
+    yaxis: { title: '% Inhibition', range: [-5, 105], gridcolor: '#eee' },
+    legend: { x: 0.02, y: 0.98 },
+    margin: { l: 60, r: 30, t: 30, b: 55 },
+    plot_bgcolor: '#fafafa',
+    paper_bgcolor: '#fff',
+    hovermode: 'closest',
+    shapes: [
+      { type: 'line', x0: C, x1: C, y0: A, y1: yIC50, line: { color: '#27ae60', width: 1.5, dash: 'dot' } },
+      { type: 'line', x0: 0.3, x1: C, y0: yIC50, y1: yIC50, line: { color: '#27ae60', width: 1.5, dash: 'dot' } }
+    ],
+    annotations: [{
+      x: Math.log10(C), y: yIC50 + 4, xref: 'x', yref: 'y',
+      text: `IC50 = ${C.toFixed(2)} µM`, showarrow: false,
+      font: { color: '#27ae60', size: 13 }, bgcolor: 'rgba(255,255,255,0.8)'
+    }]
+  };
+
+  Plotly.newPlot('plot', traces, layout, { responsive: true });
+
+  // Update results panel
+  document.getElementById('rA').textContent = A.toFixed(1) + '%';
+  document.getElementById('rB').textContent = B.toFixed(2);
+  document.getElementById('rC').textContent = C.toFixed(2) + ' µM';
+  document.getElementById('rD').textContent = D.toFixed(1) + '%';
+  document.getElementById('rR2').textContent = r2.toFixed(4);
+
+  const relErr = Math.abs(C - PUBCHEM_IC50) / PUBCHEM_IC50;
+  const badge = document.getElementById('rBadge');
+  if (relErr < 0.15) {
+    badge.textContent = '✓ Matches PubChem';
+    badge.style.cssText = 'background:#d4edda;color:#155724';
+  } else if (relErr < 0.40) {
+    badge.textContent = '~ Close to PubChem';
+    badge.style.cssText = 'background:#fff3cd;color:#856404';
+  } else {
+    badge.textContent = '⚠ Differs from PubChem';
+    badge.style.cssText = 'background:#f8d7da;color:#721c24';
+  }
+}
+
+// ── Parameter playground ──────────────────────────────────────────────────
+function initPlayground() {
+  const sA = document.getElementById('sA');
+  const sB = document.getElementById('sB');
+  const sC = document.getElementById('sC');
+  const sD = document.getElementById('sD');
+
+  function getParams() {
+    return {
+      A: parseFloat(sA.value),
+      B: parseFloat(sB.value),
+      C: Math.pow(10, parseFloat(sC.value)),
+      D: parseFloat(sD.value)
+    };
+  }
+
+  function updateSliderPlot() {
+    const { A, B, C, D } = getParams();
+    document.getElementById('valA').textContent = parseFloat(sA.value).toFixed(1);
+    document.getElementById('valB').textContent = parseFloat(sB.value).toFixed(1);
+    document.getElementById('valC').textContent = C.toFixed(2);
+    document.getElementById('valD').textContent = parseFloat(sD.value).toFixed(0);
+
+    const xCurve = logspace(0.01, 1000, 400);
+    const yCurve = xCurve.map(x => fourPL(x, A, B, C, D));
+
+    Plotly.react('sliderPlot', [
+      { x: xCurve, y: yCurve, mode: 'lines', line: { color: '#2980b9', width: 2.5 }, showlegend: false }
+    ], {
+      xaxis: { type: 'log', title: 'Concentration (µM)', gridcolor: '#eee' },
+      yaxis: { title: '% Response', range: [-15, 120], gridcolor: '#eee' },
+      margin: { l: 60, r: 30, t: 20, b: 55 },
+      plot_bgcolor: '#fafafa',
+      paper_bgcolor: '#fff'
+    }, { responsive: true });
+  }
+
+  [sA, sB, sC, sD].forEach(s => s.addEventListener('input', updateSliderPlot));
+  updateSliderPlot();
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  fitAndPlot();
+  initPlayground();
+});
+</script>
+</body>
+</html>
